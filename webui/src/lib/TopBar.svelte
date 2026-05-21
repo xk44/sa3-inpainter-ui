@@ -13,6 +13,17 @@ async function onFile(e) {
 async function onClear() {
   await apiClear();
 }
+
+function onSave() {
+  if (!session.hasAudio) return;
+  const a = document.createElement("a");
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  a.href = `/api/audio?v=${session.version}`;
+  a.download = `inpaint-${ts}.wav`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 </script>
 
 <header class="topbar">
@@ -23,6 +34,9 @@ async function onClear() {
   <div class="topbar-actions">
     <button class="btn btn-ghost" onclick={() => fileInput.click()}>
       <i class="bi bi-folder2-open"></i> Load
+    </button>
+    <button class="btn btn-ghost" onclick={onSave} disabled={!session.hasAudio}>
+      <i class="bi bi-download"></i> Save
     </button>
     <button class="btn btn-ghost" onclick={onClear}>
       <i class="bi bi-file-earmark-plus"></i> New
@@ -48,4 +62,6 @@ async function onClear() {
 .brand-icon { color: var(--accent-blue); font-size: 18px; }
 .brand-name { font-size: 14px; font-weight: 500; letter-spacing: 0.01em; }
 .topbar-actions { display: flex; gap: var(--gap-1); }
+.topbar-actions .btn[disabled] { color: var(--text-muted); cursor: default; }
+.topbar-actions .btn[disabled]:hover { color: var(--text-muted); background: transparent; }
 </style>
