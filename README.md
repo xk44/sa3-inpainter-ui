@@ -2,13 +2,13 @@
 
 Browser UI for Stable Audio 3 medium — inpainting / vary / text-to-audio. MLX-backed SAME-L decoder so it runs on Apple Silicon without flash-attn.
 
+![interface](interface.png)
+
 Upstream: [Stability-AI/stable-audio-3](https://github.com/Stability-AI/stable-audio-3) · [stabilityai/stable-audio-3-medium on HF](https://huggingface.co/stabilityai/stable-audio-3-medium)
 
 **Has:** paint-on-spectrogram inpainting · text-to-audio · audio-to-audio (vary) · scroll/pinch zoom anchored at cursor · shift-scroll pan · click-to-scrub playhead · lowpass + duck on playback over masked regions · per-latent frequency-colored waveform · ghost overlay for past inpaints · LoRA stacking with strength sliders · live system stats
 
 **Doesn't have:** variant history / undo · per-region prompts · streaming per-step diffusion previews · multi-track · MIDI · frequency-bounded selections · mobile/touch layout · auth · cloud
-
-![interface](interface.png)
 
 ## Install
 
