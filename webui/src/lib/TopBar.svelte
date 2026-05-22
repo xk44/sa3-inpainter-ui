@@ -18,16 +18,15 @@ function onClear() {
   session.clearMask();
 }
 
-async function onDownload() {
+function onSave() {
   if (!session.hasAudio) return;
-  const r = await fetch(`/api/audio?v=${session.version}`);
-  const blob = await r.blob();
-  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = `sa3-inpaint-${Date.now()}.wav`;
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  a.href = `/api/audio?v=${session.version}`;
+  a.download = `inpaint-${ts}.wav`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
 }
 </script>
 
@@ -40,14 +39,14 @@ async function onDownload() {
     <button class="btn btn-ghost" onclick={() => fileInput.click()}>
       <i class="bi bi-folder2-open"></i> Load
     </button>
+    <button class="btn btn-ghost" onclick={onSave} disabled={!session.hasAudio}>
+      <i class="bi bi-download"></i> Save
+    </button>
     <button class="btn btn-ghost" onclick={onNew}>
       <i class="bi bi-file-earmark-plus"></i> New
     </button>
     <button class="btn btn-ghost" onclick={onClear}>
       <i class="bi bi-x-lg"></i> Clear
-    </button>
-    <button class="btn btn-ghost" onclick={onDownload} disabled={!session.hasAudio}>
-      <i class="bi bi-download"></i> Export
     </button>
     <input type="file" accept="audio/*,.wav,.mp3,.flac"
            bind:this={fileInput} onchange={onFile} style="display: none" />
@@ -67,4 +66,6 @@ async function onDownload() {
 .brand-icon { color: var(--accent-blue); font-size: 18px; }
 .brand-name { font-size: 14px; font-weight: 500; letter-spacing: 0.01em; }
 .topbar-actions { display: flex; gap: var(--gap-1); }
+.topbar-actions .btn[disabled] { color: var(--text-muted); cursor: default; }
+.topbar-actions .btn[disabled]:hover { color: var(--text-muted); background: transparent; }
 </style>
