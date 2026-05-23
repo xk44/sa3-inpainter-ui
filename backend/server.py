@@ -957,10 +957,50 @@ async def get_speedups():
     }
 
 
+def _load_training_losses():
+    """Parse loss from PL metrics CSVs in training dirs. Returns {step: loss}."""
+    losses = {}
+    if not LORA_TRAIN_DIR.exists():
+        return losses
+    import csv
+    for train_dir in LORA_TRAIN_DIR.iterdir():
+        if not train_dir.is_dir():
+            continue
+        logs_dir = train_dir / "checkpoints" / "lightning_logs"
+        if not logs_dir.exists():
+            continue
+        for version_dir in sorted(logs_dir.iterdir(), reverse=True):
+            csv_path = version_dir / "metrics.csv"
+            if not csv_path.exists():
+                continue
+            try:
+                with open(csv_path) as f:
+                    for row in csv.DictReader(f):
+                        step = int(row.get("step", -1))
+                        loss = float(row.get("train/loss", 0))
+                        losses[(train_dir.name, step)] = round(loss, 4)
+            except Exception:
+                pass
+    return losses
+
 @app.get("/api/loras")
 async def list_loras():
     if not LORA_DIR.exists(): return {"dir": str(LORA_DIR), "files": []}
-    files = sorted(p.name for p in LORA_DIR.iterdir() if p.is_file() and p.suffix == ".safetensors")
+    import re
+    losses = _load_training_losses()
+    files = []
+    for p in sorted(LORA_DIR.iterdir()):
+        if not p.is_file() or p.suffix != ".safetensors":
+            continue
+        entry = {"name": p.name}
+        m = re.match(r"(.+?)-step(\d+)\.safetensors$", p.name)
+        if m:
+            train_name, step = m.group(1), int(m.group(2))
+            loss = losses.get((train_name, step - 1)) or losses.get((train_name, step))
+            if loss is not None:
+                entry["loss"] = loss
+                entry["step"] = step
+        files.append(entry)
     return {"dir": str(LORA_DIR), "files": files}
 
 
@@ -1374,6 +1414,11 @@ async def start_lora_training(body: TrainLoraBody):
     elif batch_size <= 0:
         batch_size = 1
 
+    # total_steps ÷ batch = optimizer steps (keeps wall time constant regardless of batch)
+    optimizer_steps = max(1, body.steps // batch_size)
+    checkpoint_every = max(1, body.checkpoint_every // batch_size)
+    print(f"[lora_train] total_steps={body.steps} ÷ batch={batch_size} → optimizer_steps={optimizer_steps}")
+
     script = str(Path(__file__).resolve().parent / "train_lora.py")
     cmd = [
         sys.executable, script,
@@ -1383,10 +1428,10 @@ async def start_lora_training(body: TrainLoraBody):
         "--caption", body.caption or body.name,
         "--rank", str(body.rank),
         "--adapter-type", body.adapter_type,
-        "--steps", str(body.steps),
+        "--steps", str(optimizer_steps),
         "--lr", str(body.lr),
         "--batch-size", str(batch_size),
-        "--checkpoint-every", str(body.checkpoint_every),
+        "--checkpoint-every", str(checkpoint_every),
     ]
     if body.exclude:
         cmd.extend(["--exclude"] + body.exclude)
@@ -1404,7 +1449,8 @@ async def start_lora_training(body: TrainLoraBody):
         stderr=asyncio.subprocess.STDOUT,
         env=env,
     )
-    return {"status": "started", "name": body.name, "output_dir": output_dir}
+    return {"status": "started", "name": body.name, "output_dir": output_dir,
+            "batch_size": batch_size, "optimizer_steps": optimizer_steps}
 
 
 @app.get("/api/train_lora/status")

@@ -22,14 +22,14 @@ let loraLibrary = $state([]);
 let loraDir = $state("");
 let loraPickerOpen = $state(false);
 let availableLoras = $derived(
-  loraLibrary.filter(name => !session.loras.some(l => l.name === name))
+  loraLibrary.filter(l => !session.loras.some(s => s.name === l.name))
 );
 
 async function refreshLoraLibrary() {
   try {
     const r = await fetch("/api/loras");
     const j = await r.json();
-    loraLibrary = j.files || [];
+    loraLibrary = (j.files || []).map(f => typeof f === "string" ? { name: f } : f);
     loraDir = j.dir || "";
   } catch (e) { console.warn("lora list failed:", e); }
 }
@@ -159,6 +159,7 @@ let loraBatch = $state(0);
 let loraStatus = $state("idle");
 let loraStep = $state(0);
 let loraLoss = $state(0);
+let loraTrainBatch = $state(1);
 let loraPollTimer = null;
 
 // pre-encode
@@ -221,6 +222,7 @@ async function startLoraTraining() {
     loraStatus = "running";
     loraStep = 0;
     loraLoss = 0;
+    loraTrainBatch = result.batch_size || 1;
     pollLoraStatus();
   }
 }
@@ -235,7 +237,7 @@ async function pollLoraStatus() {
     loraPollTimer = setTimeout(pollLoraStatus, 3000);
   } else if (s.status === "done" || s.status === "error") {
     if (s.status === "done") {
-      loraStep = loraSteps;
+      loraStep = Math.ceil(loraSteps / loraTrainBatch);
       loraFolder = "";
       loraName = "";
       loraTrigger = "";
@@ -768,8 +770,11 @@ $effect(() => {
     {#if loraPickerOpen}
       <div class="lora-picker">
         {#if availableLoras.length}
-          {#each availableLoras as name}
-            <button class="picker-item" onclick={() => addLora(name)}>{name}</button>
+          {#each availableLoras as lora}
+            <button class="picker-item" onclick={() => addLora(lora.name)}>
+              {lora.name}
+              {#if lora.loss != null}<span class="lora-loss">loss {lora.loss}</span>{/if}
+            </button>
           {/each}
         {:else}
           <span class="picker-empty">no loras in {loraDir || "library"}</span>
@@ -841,9 +846,9 @@ $effect(() => {
         </select>
       </div>
       <div class="form-row">
-        <label>Steps</label>
+        <label>Total steps</label>
         <div class="slider-row">
-          <input type="range" min="500" max="10000" step="100" bind:value={loraSteps} class="slider"
+          <input type="range" min="500" max="10000" step="500" bind:value={loraSteps} class="slider"
                  disabled={loraStatus === "running"}>
           <span class="value">{loraSteps}</span>
         </div>
@@ -894,9 +899,9 @@ $effect(() => {
       {#if loraStatus === "running" || loraStatus === "done"}
         <div class="train-progress">
           <div class="train-progress-bar">
-            <div class="train-progress-fill" style="width: {Math.min(100, loraStep / loraSteps * 100)}%"></div>
+            <div class="train-progress-fill" style="width: {Math.min(100, loraStep * loraTrainBatch / loraSteps * 100)}%"></div>
           </div>
-          <span class="train-progress-text">{loraStep}/{loraSteps} · loss {loraLoss.toFixed(4)}</span>
+          <span class="train-progress-text">{loraStep * loraTrainBatch}/{loraSteps} · loss {loraLoss.toFixed(4)}</span>
         </div>
       {/if}
     </div>
@@ -1051,6 +1056,7 @@ $effect(() => {
   border: 0;
 }
 .picker-item:hover { background: var(--code-highlight); color: var(--accent-blue); }
+.lora-loss { margin-left: auto; font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .picker-empty {
   padding: 6px var(--gap-3);
   font-size: 11px;
