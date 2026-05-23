@@ -1495,6 +1495,10 @@ async def start_lora_training(body: TrainLoraBody):
             cmd.extend(["--exclude"] + body.exclude)
         if body.use_compile:
             cmd.append("--compile")
+        if body.grad_checkpoint:
+            cmd.append("--grad-checkpoint")
+        if body.train_conditioner:
+            cmd.append("--train-conditioner")
 
     _lora_train_proc = await asyncio.create_subprocess_exec(
         *cmd,

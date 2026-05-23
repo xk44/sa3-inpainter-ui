@@ -56,6 +56,8 @@ def train_lora(
     exclude=None,
     encoded_dir=None,
     use_compile=False,
+    grad_checkpoint=False,
+    train_conditioner=False,
 ):
     import subprocess
 
@@ -83,9 +85,9 @@ def train_lora(
     save_dir = str(Path(output_dir) / "checkpoints")
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
-    if use_compile:
-        compile_script = Path(__file__).resolve().parent / "train_lora_compiled.py"
-        cmd_script = str(compile_script)
+    use_enhanced = use_compile or grad_checkpoint or train_conditioner
+    if use_enhanced:
+        cmd_script = str(Path(__file__).resolve().parent / "train_lora_compiled.py")
     else:
         cmd_script = str(train_script)
 
@@ -122,6 +124,16 @@ def train_lora(
         token_file = Path.home() / ".cache/huggingface/token"
         if token_file.exists():
             env["HF_TOKEN"] = token_file.read_text().strip()
+    # enhanced wrapper env vars
+    if use_compile:
+        env["SA3_COMPILE"] = "1"
+    if grad_checkpoint:
+        env["SA3_GRAD_CHECKPOINT"] = "1"
+    if train_conditioner:
+        env["SA3_TRAIN_CONDITIONER"] = "1"
+        env["SA3_LORA_RANK"] = str(rank)
+        env["SA3_ADAPTER_TYPE"] = adapter_type
+        env["SA3_LORA_ALPHA"] = str(rank)
 
     proc = subprocess.Popen(
         cmd,
@@ -252,6 +264,8 @@ if __name__ == "__main__":
     p.add_argument("--exclude", nargs="*", default=None)
     p.add_argument("--encoded-dir", default=None)
     p.add_argument("--compile", action="store_true", default=False)
+    p.add_argument("--grad-checkpoint", action="store_true", default=False)
+    p.add_argument("--train-conditioner", action="store_true", default=False)
     args = p.parse_args()
 
     train_lora(
@@ -269,4 +283,6 @@ if __name__ == "__main__":
         exclude=args.exclude,
         encoded_dir=args.encoded_dir,
         use_compile=args.compile,
+        grad_checkpoint=args.grad_checkpoint,
+        train_conditioner=args.train_conditioner,
     )

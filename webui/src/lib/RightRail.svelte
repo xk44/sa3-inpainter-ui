@@ -155,6 +155,9 @@ let loraRank = $state(16);
 let loraSteps = $state(1000);
 let loraAdapter = $state("dora-rows");
 let loraCompile = $state(false);
+let loraDistShift = $state(true);
+let loraGradCheckpoint = $state(true);
+let loraTrainConditioner = $state(false);
 let loraBatch = $state(0);
 let loraStatus = $state("idle");
 let loraStep = $state(0);
@@ -216,6 +219,8 @@ async function startLoraTraining() {
     folder: loraFolder, name: loraName, caption,
     rank: loraRank, adapter_type: loraAdapter, steps: loraSteps,
     batch_size: loraBatch, use_compile: loraCompile,
+    dist_shift: loraDistShift, grad_checkpoint: loraGradCheckpoint,
+    train_conditioner: loraTrainConditioner,
   });
   if (result) {
     session.modelLoaded = false;
@@ -869,6 +874,30 @@ $effect(() => {
           <input type="checkbox" bind:checked={loraCompile}
                  disabled={loraStatus === "running"}>
           <span>{loraCompile ? "On" : "Off"}</span>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Dist shift</label>
+        <label class="toggle-sm">
+          <input type="checkbox" bind:checked={loraDistShift}
+                 disabled={loraStatus === "running"}>
+          <span>{loraDistShift ? "On" : "Off"}</span>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Grad ckpt</label>
+        <label class="toggle-sm">
+          <input type="checkbox" bind:checked={loraGradCheckpoint}
+                 disabled={loraStatus === "running"}>
+          <span>{loraGradCheckpoint ? "On" : "Off"}</span>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Train cond</label>
+        <label class="toggle-sm">
+          <input type="checkbox" bind:checked={loraTrainConditioner}
+                 disabled={loraStatus === "running"}>
+          <span>{loraTrainConditioner ? "On" : "Off"}</span>
         </label>
       </div>
       <div class="form-row">
