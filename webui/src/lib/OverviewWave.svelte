@@ -91,7 +91,19 @@ function onPointerDown(e) {
   if (e.button !== 0) return;
   if (!session.hasAudio) return;
   const mode = hitTest(e.clientX);
-  if (!mode) return;
+  if (!mode) {
+    const rect = body.getBoundingClientRect();
+    const innerW = Math.max(1, rect.width - 2 * INSET_PX);
+    const clickNorm = (e.clientX - rect.left - INSET_PX) / innerW;
+    const span = session.zoomEnd - session.zoomStart;
+    let newStart = clickNorm - span / 2;
+    let newEnd = clickNorm + span / 2;
+    if (newStart < 0) { newEnd -= newStart; newStart = 0; }
+    if (newEnd > 1) { newStart -= (newEnd - 1); newEnd = 1; newStart = Math.max(0, newStart); }
+    session.zoomStart = newStart;
+    session.zoomEnd = newEnd;
+    return;
+  }
   dragMode = mode;
   dragStartX = e.clientX;
   dragStartZoom = { start: session.zoomStart, end: session.zoomEnd };

@@ -1,20 +1,20 @@
 <script>
-import { session } from "./session.svelte.js";
+import { session, apiGetSettings } from "./session.svelte.js";
 import { fmtTime } from "./util.js";
+import SettingsModal from "./SettingsModal.svelte";
+import { onMount } from "svelte";
 
 let currentTime = $derived(session.playhead * session.trackSeconds);
 let totalTime = $derived(session.trackSeconds);
+let settingsOpen = $state(false);
 
-function toggleVis() {
-  console.log("[vis-toggle] click. before:", session.visMode);
-  session.visMode = session.visMode === "spectrogram" ? "waveform" : "spectrogram";
-  console.log("[vis-toggle] after:", session.visMode);
-}
+onMount(async () => {
+  const s = await apiGetSettings();
+  if (s?.first_run) settingsOpen = true;
+});
 
 function togglePlay() {
-  console.log("[play] click. before:", session.playing);
   session.playing = !session.playing;
-  console.log("[play] after:", session.playing);
 }
 </script>
 
@@ -38,27 +38,44 @@ function togglePlay() {
 
   <!-- centered transport -->
   <div class="transport" class:disabled={!session.hasAudio}>
-    <button type="button" class="icon-btn" disabled={!session.hasAudio}><i class="bi bi-arrow-repeat"></i></button>
-    <button type="button" class="icon-btn" disabled={!session.hasAudio}><i class="bi bi-skip-backward-fill"></i></button>
+    <button type="button" class="icon-btn" class:active={session.looping} disabled={!session.hasAudio}
+      onclick={() => session.looping = !session.looping}><i class="bi bi-arrow-repeat"></i></button>
+    <button type="button" class="icon-btn" disabled={!session.hasAudio}
+      onclick={() => session.playhead = 0}><i class="bi bi-skip-backward-fill"></i></button>
     <button type="button" class="icon-btn play" disabled={!session.hasAudio} onclick={togglePlay}>
       <i class="bi {session.playing ? 'bi-pause-fill' : 'bi-play-fill'}"></i>
     </button>
-    <button type="button" class="icon-btn" disabled={!session.hasAudio} onclick={() => session.playing = false}>
+    <button type="button" class="icon-btn" disabled={!session.hasAudio}
+      onclick={() => { session.playing = false; session.playhead = 0; }}>
       <i class="bi bi-stop-fill"></i>
     </button>
-    <button type="button" class="icon-btn" disabled={!session.hasAudio}><i class="bi bi-skip-forward-fill"></i></button>
+    <button type="button" class="icon-btn" disabled={!session.hasAudio}
+      onclick={() => session.playhead = 1}><i class="bi bi-skip-forward-fill"></i></button>
   </div>
 
   <!-- right cluster -->
   <div class="right-cluster">
+    <button class="mode-toggle" class:active={session.advancedMode}
+      onclick={() => session.advancedMode = !session.advancedMode}
+      title={session.advancedMode ? "Switch to simple mode" : "Switch to advanced mode"}>
+      <i class="bi {session.advancedMode ? 'bi-toggles' : 'bi-sliders'}"></i>
+      {session.advancedMode ? "Advanced" : "Simple"}
+    </button>
+    <button class="mode-toggle" onclick={() => settingsOpen = true} title="Settings">
+      <i class="bi bi-gear"></i>
+    </button>
+    <div class="status">
+      <span class="status-dot" class:ok={session.modelLoaded}></span>
+      <span class="status-label">{session.modelLoaded ? "Model ready" : "Loading…"}</span>
+    </div>
     <div class="sys-stats">
       <div class="stat">
         <span class="stat-label">CPU</span><span class="stat-value">{session.stats.cpu ?? 0}%</span>
         <div class="bar"><div class="bar-fill" style="width:{session.stats.cpu ?? 0}%"></div></div>
       </div>
       <div class="stat">
-        <span class="stat-label">MPS</span><span class="stat-value">{(session.stats.mpsAllocGb ?? 0).toFixed(1)} GB</span>
-        <div class="bar"><div class="bar-fill" style="width:{Math.min(100, (session.stats.mpsAllocGb ?? 0) / 8 * 100)}%"></div></div>
+        <span class="stat-label">GPU</span><span class="stat-value">{(session.stats.gpuAllocGb ?? 0).toFixed(1)} GB</span>
+        <div class="bar"><div class="bar-fill" style="width:{Math.min(100, (session.stats.gpuAllocGb ?? 0) / 24 * 100)}%"></div></div>
       </div>
       <div class="stat">
         <span class="stat-label">RAM</span><span class="stat-value">{(session.stats.ramUsedGb ?? 0).toFixed(1)}/{(session.stats.ramTotalGb ?? 0).toFixed(0)}</span>
@@ -67,6 +84,8 @@ function togglePlay() {
     </div>
   </div>
 </footer>
+
+<SettingsModal bind:visible={settingsOpen} />
 
 <style>
 .bottombar {
@@ -98,6 +117,7 @@ function togglePlay() {
   justify-self: end;
 }
 .icon-btn.play { color: var(--text-primary); font-size: 16px; }
+.icon-btn.active { color: var(--accent-blue); }
 .icon-btn[disabled] { color: var(--text-muted); cursor: default; }
 .icon-btn[disabled]:hover { background: transparent; color: var(--text-muted); }
 .volume { display: flex; align-items: center; gap: var(--gap-2); }
@@ -126,7 +146,23 @@ function togglePlay() {
 .time-sep { color: var(--text-muted); }
 .time-total { color: var(--text-secondary); }
 .meta-info { color: var(--text-muted); }
-.vis-toggle { color: var(--text-primary); }
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  padding: 2px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border: 1px solid var(--accent-blue);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+.mode-toggle:hover { color: var(--text-secondary); }
+.mode-toggle.active { color: var(--accent-blue); border-color: var(--accent-blue); }
+.status-label { font-size: 10px; color: var(--text-muted); }
 .status {
   display: flex;
   align-items: center;

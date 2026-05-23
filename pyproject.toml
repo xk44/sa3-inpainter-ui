@@ -1,14 +1,13 @@
 [project]
-name = "sa3-mlx"
+name = "sa3-inpainter-ui"
 version = "0.1.0"
-description = "Add your description here"
+description = "SA3 audio inpainting UI — dual CUDA/MLX backend"
 requires-python = ">=3.11"
 dependencies = [
     "einops>=0.8.2",
     "fastapi>=0.136.1",
     "huggingface-hub>=1.15.0",
     "matplotlib>=3.10.9",
-    "mlx>=0.31.2",
     "numpy>=2.4.6",
     "psutil>=7.2.2",
     "python-multipart>=0.0.29",
@@ -22,6 +21,9 @@ dependencies = [
     "uvicorn>=0.47.0",
     "stable-audio-3",
 ]
+
+[project.optional-dependencies]
+mlx = ["mlx>=0.31.2"]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"

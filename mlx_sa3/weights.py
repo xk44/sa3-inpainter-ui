@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import os
+from pathlib import Path
 from typing import Dict
 
 import mlx.core as mx
@@ -17,10 +18,8 @@ import numpy as np
 from safetensors import safe_open
 
 
-SAFETENSORS_PATH = os.environ.get(
-    "SA3_MEDIUM_SAFETENSORS",
-    "/Users/lyra/Projects/stable-audio-3/models/stable-audio-3-medium/model.safetensors",
-)
+_model_dir = os.environ.get("SA3_MODEL_DIR", str(Path.home() / "models/stable-audio-3-medium"))
+SAFETENSORS_PATH = os.environ.get("SA3_MEDIUM_SAFETENSORS", f"{_model_dir}/model.safetensors")
 
 
 def _wnconv1d_fold(weight_g: np.ndarray, weight_v: np.ndarray) -> np.ndarray:

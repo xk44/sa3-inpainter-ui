@@ -1,15 +1,18 @@
 <script>
 import { onMount } from "svelte";
-import { session, apiState, apiUpload } from "./lib/session.svelte.js";
+import { session, apiState, apiUpload, apiGenerate, apiUndo, apiRedo } from "./lib/session.svelte.js";
 import TopBar from "./lib/TopBar.svelte";
 import OverviewWave from "./lib/OverviewWave.svelte";
 import TimeAxis from "./lib/TimeAxis.svelte";
 import MainCanvas from "./lib/MainCanvas.svelte";
 import RightRail from "./lib/RightRail.svelte";
 import BottomBar from "./lib/BottomBar.svelte";
+import Toast from "./lib/Toast.svelte";
+import HelpOverlay from "./lib/HelpOverlay.svelte";
 
 let audioEl = $state(null);
 let isDragOver = $state(false);
+let helpOpen = $state(false);
 
 // Web Audio graph for live volume + masked-region ducking
 let audioCtx = null;
@@ -40,6 +43,7 @@ function ensureAudioGraph() {
 function onKeyDown(e) {
   const t = e.target;
   if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  const mod = e.ctrlKey || e.metaKey;
   if (e.code === "Space") {
     e.preventDefault();
     session.playing = !session.playing;
@@ -48,6 +52,40 @@ function onKeyDown(e) {
       e.preventDefault();
       session.clearMask();
     }
+  } else if (mod && e.key === "g") {
+    e.preventDefault();
+    apiGenerate().catch(console.error);
+  } else if (!mod && e.key === "r") {
+    e.preventDefault();
+    session.seed = Math.floor(Math.random() * 1000000);
+    apiGenerate().catch(console.error);
+  } else if (mod && e.shiftKey && e.key === "Z") {
+    e.preventDefault();
+    const type = session.redo();
+    if (type === "audio") apiRedo().catch(console.error);
+  } else if (mod && e.key === "z") {
+    e.preventDefault();
+    const type = session.undo();
+    if (type === "audio") apiUndo().catch(console.error);
+  } else if (mod && e.key === "a") {
+    e.preventDefault();
+    const N = session.latentCount;
+    if (N > 0) session.paint(0, N, "regen");
+  } else if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    const step = session.trackSeconds > 0
+      ? session.downsampleRatio / session.sampleRate / session.trackSeconds
+      : 0;
+    session.playhead = Math.max(0, session.playhead - step);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    const step = session.trackSeconds > 0
+      ? session.downsampleRatio / session.sampleRate / session.trackSeconds
+      : 0;
+    session.playhead = Math.min(1, session.playhead + step);
+  } else if (e.key === "?") {
+    e.preventDefault();
+    helpOpen = !helpOpen;
   }
 }
 
@@ -87,42 +125,39 @@ function currentMaskedGain() {
 }
 let _maskedNow = false;
 
-// robust seek: applies immediately if audio is ready, otherwise queues for loadedmetadata
-function seekTo(seconds) {
-  if (!audioEl) return;
-  const apply = () => { try { audioEl.currentTime = Math.min(seconds, audioEl.duration || seconds); } catch {} };
-  if (audioEl.readyState >= 1 && audioEl.duration) apply();
-  else audioEl.addEventListener("loadedmetadata", apply, { once: true });
-}
-
-// when audio source bumps version: swap src, then restore last known playhead
+// when audio source bumps version: swap src without interrupting playback
 $effect(() => {
   if (!audioEl) return;
   session.version;
   if (!session.hasAudio) { audioEl.src = ""; return; }
   const wasPlaying = !audioEl.paused;
-  audioEl.src = `/api/audio?v=${session.version}`;
-  audioEl.addEventListener("loadedmetadata", () => {
-    seekTo(session.playhead * (session.trackSeconds || audioEl.duration || 0));
+  const t = audioEl.currentTime || 0;
+  const onReady = () => {
+    audioEl.removeEventListener("loadedmetadata", onReady);
+    try { audioEl.currentTime = Math.min(t, (audioEl.duration || t)); } catch {}
     if (wasPlaying) audioEl.play().catch(() => {});
-  }, { once: true });
+  };
+  audioEl.addEventListener("loadedmetadata", onReady);
+  audioEl.src = `/api/audio?v=${session.version}`;
 });
 
-// when user moves playhead via UI, sync audio (queues if audio isn't ready yet)
+// when user moves playhead via UI, sync audio
 $effect(() => {
   if (!audioEl || !session.hasAudio) return;
   const targetTime = session.playhead * session.trackSeconds;
-  if (!isFinite(targetTime)) return;
-  if (audioEl.readyState >= 1 && audioEl.duration) {
-    if (Math.abs(audioEl.currentTime - targetTime) > 0.25) {
-      try { audioEl.currentTime = Math.min(targetTime, audioEl.duration); } catch {}
-    }
-  } else {
-    seekTo(targetTime);
+  if (Math.abs(audioEl.currentTime - targetTime) > 0.5) {
+    audioEl.currentTime = targetTime;
   }
 });
 
-function onAudioEnded() { session.playing = false; }
+function onAudioEnded() {
+  if (session.looping) {
+    audioEl.currentTime = 0;
+    audioEl.play().catch(() => {});
+  } else {
+    session.playing = false;
+  }
+}
 
 // smooth playhead + filter ducking inside masked regions
 let rafHandle = 0;
@@ -181,9 +216,11 @@ async function pollStats() {
       ram: Math.round(j.ram_used / j.ram_total * 100),
       ramUsedGb: j.ram_used,
       ramTotalGb: j.ram_total,
-      mpsAllocGb: j.mps_alloc,
+      gpuAllocGb: j.gpu_alloc,
     };
     session.modelLoaded = j.model_loaded;
+    if (j.precision) session.precision = j.precision;
+    if (j.backend) session.backend = j.backend;
   } catch (e) {
     session.modelLoaded = false;
   }
@@ -234,6 +271,9 @@ onMount(() => {
   {#if isDragOver}
     <div class="drop-overlay">drop audio file to load</div>
   {/if}
+
+  <Toast />
+  <HelpOverlay bind:visible={helpOpen} />
 </div>
 
 <audio

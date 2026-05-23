@@ -21,22 +21,26 @@ function draw() {
   ctx.clearRect(0, 0, w, h);
 
   const N = session.latentCount;
-  const colW = w / N;
+  if (N === 0) return;
+  const lStart = session.zoomStart * N;
+  const lEnd = session.zoomEnd * N;
+  const visCount = lEnd - lStart;
+  const colW = w / visCount;
   const barW = Math.max(0.5, colW * 0.6);
 
   // preserve background (subtle grey)
   ctx.fillStyle = "#1f1f1f";
-  for (let i = 0; i < N; i++) {
-    const x = i * colW + (colW - barW) / 2;
+  for (let i = Math.floor(lStart); i < Math.ceil(lEnd); i++) {
+    const x = (i - lStart) * colW + (colW - barW) / 2;
     ctx.fillRect(x, h * 0.2, barW, h * 0.6);
   }
 
   // committed mask painted (accent blue)
   const accent = cssVar("--accent-blue");
   ctx.fillStyle = accent;
-  for (let i = 0; i < N; i++) {
+  for (let i = Math.floor(lStart); i < Math.ceil(lEnd); i++) {
     if (session.mask[i]) {
-      const x = i * colW + (colW - barW) / 2;
+      const x = (i - lStart) * colW + (colW - barW) / 2;
       ctx.fillRect(x, h * 0.1, barW, h * 0.8);
     }
   }
@@ -45,17 +49,20 @@ function draw() {
   if (paintActive) {
     const lo = Math.min(paintAnchor, paintCursor);
     const hi = Math.max(paintAnchor, paintCursor);
+    const xLo = (lo - lStart) * colW;
+    const xHi = (hi - lStart + 1) * colW;
     ctx.fillStyle = paintMode === "regen"
       ? "rgba(0, 120, 202, 0.45)"
       : "rgba(241, 76, 76, 0.45)";
-    ctx.fillRect(lo * colW, 0, (hi - lo + 1) * colW, h);
+    ctx.fillRect(xLo, 0, xHi - xLo, h);
   }
 }
 
 $effect(() => {
-  // re-draw on mask / latent-count / paint state changes
+  // re-draw on mask / latent-count / zoom / paint state changes
   session.mask;
   session.latentCount;
+  session.zoomStart; session.zoomEnd;
   paintActive; paintAnchor; paintCursor;
   draw();
 });
@@ -63,7 +70,10 @@ $effect(() => {
 function xToLatent(clientX) {
   const rect = body.getBoundingClientRect();
   const norm = (clientX - rect.left) / rect.width;
-  return Math.max(0, Math.min(session.latentCount - 1, Math.round(norm * session.latentCount)));
+  const N = session.latentCount;
+  const lStart = session.zoomStart * N;
+  const lEnd = session.zoomEnd * N;
+  return Math.max(0, Math.min(N - 1, Math.round(lStart + norm * (lEnd - lStart))));
 }
 
 function onPointerDown(e) {

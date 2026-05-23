@@ -10,8 +10,12 @@ async function onFile(e) {
   fileInput.value = "";
 }
 
-async function onClear() {
+async function onNew() {
   await apiClear();
+}
+
+function onClear() {
+  session.clearMask();
 }
 
 function onSave() {
@@ -38,7 +42,7 @@ function onSave() {
     <button class="btn btn-ghost" onclick={onSave} disabled={!session.hasAudio}>
       <i class="bi bi-download"></i> Save
     </button>
-    <button class="btn btn-ghost" onclick={onClear}>
+    <button class="btn btn-ghost" onclick={onNew}>
       <i class="bi bi-file-earmark-plus"></i> New
     </button>
     <button class="btn btn-ghost" onclick={onClear}>
