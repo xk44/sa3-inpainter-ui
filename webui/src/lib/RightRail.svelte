@@ -853,9 +853,10 @@ $effect(() => {
       <div class="form-row">
         <label>Total steps</label>
         <div class="slider-row">
-          <input type="range" min="500" max="10000" step="500" bind:value={loraSteps} class="slider"
+          <input type="range" min="500" max="60000" step="500" bind:value={loraSteps} class="slider"
                  disabled={loraStatus === "running"}>
-          <span class="value">{loraSteps}</span>
+          <input type="number" min="100" max="100000" step="100" bind:value={loraSteps} class="value-input"
+                 disabled={loraStatus === "running"}>
         </div>
       </div>
       <div class="form-row">
@@ -1008,6 +1009,19 @@ $effect(() => {
   min-width: 32px;
   text-align: right;
 }
+.slider-row .value-input {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-primary);
+  background: var(--bg-secondary, #1a1a1a);
+  border: 1px solid var(--border, #333);
+  border-radius: 3px;
+  width: 52px;
+  padding: 1px 4px;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.slider-row .value-input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .select, .seed-input {
   background: var(--code-block);
   border: 1px solid var(--border-color);
